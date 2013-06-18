@@ -285,30 +285,55 @@ public class StatelessKnowledgeSessionImpl
             }
         } finally {
             ((StatefulKnowledgeSessionImpl) ksession).session.endBatchExecution();
-            ksession.dispose();
+            dispose( ksession );
         }
     }
 
     public void execute(Object object) {
         StatefulKnowledgeSession ksession = newWorkingMemory();
-
-        ksession.insert( object );
-        ksession.fireAllRules( );
-        ksession.dispose();
+        try {
+            ksession.insert( object );
+            ksession.fireAllRules( );
+        } finally {
+            dispose( ksession );
+        }
     }
 
     public void execute(Iterable objects) {
         StatefulKnowledgeSession ksession = newWorkingMemory();
-
-        for ( Object object : objects ) {
-            ksession.insert( object );
+        try {
+            for ( Object object : objects ) {
+                ksession.insert( object );
+            }
+            ksession.fireAllRules( );
+        } finally {
+            dispose( ksession );
         }
-        ksession.fireAllRules( );
-        ksession.dispose();
     }
     
     public Environment getEnvironment() {
         return environment;
     }
+
+    protected void dispose( StatefulKnowledgeSession ksession ) {
+        ReteooWorkingMemory wm = (ReteooWorkingMemory) ((StatefulKnowledgeSessionImpl) ksession).getInternalWorkingMemory();
+
+        for ( org.drools.event.AgendaEventListener listener: wm.getAgendaEventSupport().getEventListeners() ) {
+            this.agendaEventSupport.removeEventListener( listener );
+        }
+        for ( org.drools.event.WorkingMemoryEventListener listener: wm.getWorkingMemoryEventSupport().getEventListeners() ) {
+            this.workingMemoryEventSupport.removeEventListener( listener );
+        }
+        InternalProcessRuntime processRuntime = wm.getProcessRuntime();
+        if ( processRuntime != null ) {
+            for ( ProcessEventListener listener: processRuntime.getProcessEventListeners() ) {
+                this.processEventSupport.removeEventListener( listener );
+            }
+        }
+        initialized = false;
+    }
+
+
+
 
 }
